@@ -1,0 +1,11 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Home Assistant Add-on: YCast - YCast Service
+# ==============================================================================
+
+YCAST_PORT="${YCAST_PORT:-80}"
+LOG_LEVEL="${LOG_LEVEL:-info}"
+
+bashio::log.info "Starting YCast (port ${YCAST_PORT})..."
+exec python3 -m ycast -p "${YCAST_PORT}" -c /data/stations.yml

@@ -1,0 +1,24 @@
+name: "YCast"
+description: "vTuner internet radio replacement for AVR devices using YCast"
+version: "1.0.0"
+slug: "ycast"
+url: "https://github.com/tost11/ycast-home-assistant-addon"
+arch:
+  - aarch64
+  - amd64
+init: false
+startup: services
+boot: auto
+host_network: true
+ports:
+  80/tcp: 80
+ports_description:
+  80/tcp: "HTTP - AVR devices connect here"
+map:
+  - share:rw
+options:
+  port_avr: 80
+  log_level: "info"
+schema:
+  port_avr: "int(1,65535)"
+  log_level: "list(none|info|warning|error|debug)"

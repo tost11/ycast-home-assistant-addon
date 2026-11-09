@@ -1,0 +1,43 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Home Assistant Add-on: YCast - Init Configuration
+# ==============================================================================
+
+declare port_avr
+declare log_level
+declare server_ip
+
+bashio::log.info "Initialising YCast configuration..."
+
+# ── Read add-on options ──────────────────────────────────────────────────────
+
+port_avr=$(bashio::config 'port_avr')
+log_level=$(bashio::config 'log_level')
+
+bashio::log.info "Port: AVR=${port_avr} LogLevel=${log_level}"
+
+# ── Detect host IP ───────────────────────────────────────────────────────────
+
+server_ip=$(ip -4 route get 8.8.8.8 2>/dev/null | awk '{for(i=1;i<=NF;i++) if ($i=="src") print $(i+1)}' | head -1)
+if [[ -z "${server_ip}" ]]; then
+    server_ip=$(hostname -I | awk '{print $1}')
+fi
+bashio::log.info "Detected server IP: ${server_ip}"
+
+# ── Ensure persistent data directories ───────────────────────────────────────
+
+mkdir -p /data
+
+# Copy default stations on first run
+if [[ ! -f /data/stations.yml ]]; then
+    cp /opt/ycast/stations.yml /data/stations.yml
+    bashio::log.info "Created default stations.yml"
+fi
+
+# ── Export environment for child services ────────────────────────────────────
+
+printf "%s" "${port_avr}" > /run/s6/container_environment/YCAST_PORT
+printf "%s" "${server_ip}" > /run/s6/container_environment/YCAST_SERVER_IP
+
+bashio::log.info "YCast configuration complete"
