@@ -9,7 +9,6 @@ arch:
 init: false
 startup: services
 boot: auto
-host_network: true
 ports:
   80/tcp: 80
 ports_description:
