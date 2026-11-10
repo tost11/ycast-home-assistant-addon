@@ -1,0 +1,236 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>YCast Stations</title>
+<style>
+  body { font-family: system-ui, sans-serif; margin: 2rem auto; max-width: 900px; padding: 0 1rem; color: #222; }
+  h1 { font-size: 1.4rem; }
+  h2 { font-size: 1.1rem; margin-top: 2rem; }
+  h3 { font-size: 1rem; margin: 1rem 0 0.3rem; }
+  input, button { font: inherit; padding: 0.4rem 0.6rem; }
+  input { border: 1px solid #bbb; border-radius: 4px; }
+  button { border: 1px solid #2660a4; background: #2660a4; color: #fff; border-radius: 4px; cursor: pointer; }
+  button:hover { opacity: 0.9; }
+  button.secondary { background: #fff; color: #2660a4; }
+  button.danger { background: #b3261e; border-color: #b3261e; }
+  .row { display: flex; flex-wrap: wrap; gap: 0.5rem; margin: 0.5rem 0; align-items: center; }
+  .row input { flex: 1; min-width: 120px; }
+  .station { display: flex; gap: 0.5rem; align-items: center; padding: 0.3rem 0; border-bottom: 1px solid #eee; }
+  .station input { flex: 1; }
+  .station .name { flex: 0 0 30%; }
+  .station .url { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: #555; }
+  .meta { color: #777; font-size: 0.85rem; }
+  .status { margin: 0.5rem 0; min-height: 1.2em; }
+  .status.error { color: #b3261e; }
+  .status.ok { color: #1e7e34; }
+  table { width: 100%; border-collapse: collapse; }
+  td { padding: 0.3rem 0.5rem; border-bottom: 1px solid #eee; vertical-align: middle; }
+  .empty { color: #777; font-style: italic; }
+</style>
+</head>
+<body>
+<h1>YCast Stations</h1>
+<p class="meta">My Stations shown to your AVR. Changes apply immediately, no restart needed.</p>
+<div id="status" class="status"></div>
+
+<h2>Add station</h2>
+<div class="row">
+  <input id="add-category" list="categories" placeholder="Category">
+  <input id="add-name" placeholder="Station name">
+  <input id="add-url" placeholder="http://stream-url.mp3">
+  <button id="add-btn">Add</button>
+</div>
+<datalist id="categories"></datalist>
+
+<h2>Search Radio Browser</h2>
+<div class="row">
+  <input id="search-q" placeholder="Search stations (min. 2 chars)">
+  <button id="search-btn">Search</button>
+</div>
+<div id="search-results"></div>
+
+<h2>Categories</h2>
+<div id="stations"></div>
+
+<script>
+const statusEl = document.getElementById('status');
+const stationsEl = document.getElementById('stations');
+const searchResultsEl = document.getElementById('search-results');
+let stations = {};
+
+function el(tag, attrs, ...children) {
+  const node = document.createElement(tag);
+  for (const [key, value] of Object.entries(attrs || {})) {
+    if (key === 'class') node.className = value;
+    else if (key.startsWith('on') && typeof value === 'function') node.addEventListener(key.slice(2), value);
+    else node.setAttribute(key, value);
+  }
+  for (const child of children.flat(Infinity)) {
+    if (child == null) continue;
+    node.appendChild(typeof child === 'string' ? document.createTextNode(child) : child);
+  }
+  return node;
+}
+
+function setStatus(msg, cls) {
+  statusEl.textContent = msg || '';
+  statusEl.className = 'status' + (cls ? ' ' + cls : '');
+}
+
+async function load() {
+  const res = await fetch('api/stations');
+  if (!res.ok) {
+    let msg = 'HTTP ' + res.status;
+    try { const body = await res.json(); if (body.error) msg = body.error; } catch (e) {}
+    throw new Error(msg);
+  }
+  stations = await res.json();
+}
+
+async function save() {
+  const res = await fetch('api/stations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(stations)
+  });
+  if (!res.ok) {
+    let msg = 'HTTP ' + res.status;
+    try { const body = await res.json(); if (body.error) msg = body.error; } catch (e) {}
+    throw new Error(msg);
+  }
+}
+
+function render() {
+  const cats = Object.keys(stations);
+  const dl = document.getElementById('categories');
+  dl.innerHTML = '';
+  for (const c of cats) dl.appendChild(el('option', { value: c }));
+
+  stationsEl.innerHTML = '';
+  if (cats.length === 0) {
+    stationsEl.appendChild(el('p', { class: 'empty' }, 'No stations yet. Add one above or search for one.'));
+    return;
+  }
+  for (const cat of cats) {
+    const section = el('div');
+    section.appendChild(el('h3', {}, cat + ' (' + Object.keys(stations[cat]).length + ')'));
+    const list = el('div');
+    for (const name of Object.keys(stations[cat])) {
+      list.appendChild(stationRow(cat, name, stations[cat][name]));
+    }
+    section.appendChild(list);
+    stationsEl.appendChild(section);
+  }
+}
+
+function stationRow(cat, name, url) {
+  const row = el('div', { class: 'station' },
+    el('span', { class: 'name' }, name),
+    el('span', { class: 'url', title: url }, url));
+  row.appendChild(el('button', { class: 'secondary', onclick: () => editStation(row, cat, name, url) }, 'Edit'));
+  row.appendChild(el('button', { class: 'danger', onclick: () => removeStation(cat, name) }, 'Remove'));
+  return row;
+}
+
+function editStation(row, cat, name, url) {
+  const nameInput = el('input');
+  nameInput.value = name;
+  const urlInput = el('input');
+  urlInput.value = url;
+  const editRow = el('div', { class: 'station' }, nameInput, urlInput,
+    el('button', { onclick: async () => {
+      const nn = nameInput.value.trim();
+      const nu = urlInput.value.trim();
+      if (!nn || !nu) { setStatus('Name and URL are required', 'error'); return; }
+      delete stations[cat][name];
+      if (Object.keys(stations[cat]).length === 0) delete stations[cat];
+      stations[cat] = stations[cat] || {};
+      stations[cat][nn] = nu;
+      try { await save(); setStatus('Station saved', 'ok'); }
+      catch (err) { setStatus('Save failed: ' + err.message, 'error'); }
+      render();
+    }}, 'Save'),
+    el('button', { class: 'secondary', onclick: render }, 'Cancel'));
+  row.replaceWith(editRow);
+}
+
+async function removeStation(cat, name) {
+  delete stations[cat][name];
+  if (Object.keys(stations[cat]).length === 0) delete stations[cat];
+  try { await save(); setStatus('Station removed', 'ok'); }
+  catch (err) { setStatus('Save failed: ' + err.message, 'error'); }
+  render();
+}
+
+async function addStation() {
+  const catInput = document.getElementById('add-category');
+  const nameInput = document.getElementById('add-name');
+  const urlInput = document.getElementById('add-url');
+  const cat = catInput.value.trim();
+  const name = nameInput.value.trim();
+  const url = urlInput.value.trim();
+  if (!cat || !name || !url) { setStatus('Category, name and URL are required', 'error'); return; }
+  stations[cat] = stations[cat] || {};
+  stations[cat][name] = url;
+  try { await save(); setStatus('Station added to ' + cat, 'ok'); }
+  catch (err) { setStatus('Save failed: ' + err.message, 'error'); }
+  nameInput.value = '';
+  urlInput.value = '';
+  render();
+}
+
+async function addFromSearch(s) {
+  const catInput = document.getElementById('add-category');
+  let cat = catInput.value.trim();
+  if (!cat) cat = (prompt('Which category should "' + s.name + '" go into?', '') || '').trim();
+  if (!cat) { setStatus('No category given', 'error'); return; }
+  stations[cat] = stations[cat] || {};
+  stations[cat][s.name] = s.url;
+  try { await save(); setStatus('"' + s.name + '" added to ' + cat, 'ok'); }
+  catch (err) { setStatus('Save failed: ' + err.message, 'error'); }
+  render();
+}
+
+async function search() {
+  const q = document.getElementById('search-q').value.trim();
+  if (q.length < 2) { setStatus('Search needs at least 2 characters', 'error'); return; }
+  setStatus('Searching...');
+  searchResultsEl.innerHTML = '';
+  try {
+    const res = await fetch('api/search?q=' + encodeURIComponent(q));
+    const body = await res.json();
+    if (!res.ok) throw new Error(body.error || 'HTTP ' + res.status);
+    if (body.length === 0) {
+      searchResultsEl.appendChild(el('p', { class: 'empty' }, 'No stations found.'));
+      return;
+    }
+    const table = el('table');
+    for (const s of body) {
+      const meta = [s.country, s.bitrate ? s.bitrate + ' kbps' : null, s.tags]
+        .filter(Boolean).join(' · ');
+      const tr = el('tr', {},
+        el('td', {}, s.name),
+        el('td', { class: 'meta' }, meta),
+        el('td', {}, el('button', { onclick: () => addFromSearch(s) }, 'Add')));
+      table.appendChild(tr);
+    }
+    searchResultsEl.appendChild(table);
+    setStatus(body.length + ' results. "Add" uses the category from "Add station" above, or asks for one.', 'ok');
+  } catch (err) {
+    setStatus('Search failed: ' + err.message, 'error');
+  }
+}
+
+document.getElementById('add-btn').addEventListener('click', addStation);
+document.getElementById('add-url').addEventListener('keydown', e => { if (e.key === 'Enter') addStation(); });
+document.getElementById('search-btn').addEventListener('click', search);
+document.getElementById('search-q').addEventListener('keydown', e => { if (e.key === 'Enter') search(); });
+
+load()
+  .then(render)
+  .catch(err => setStatus('Failed to load stations: ' + err.message, 'error'));
+</script>
+</body>
+</html>

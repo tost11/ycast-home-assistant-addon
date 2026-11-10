@@ -1,7 +1,5 @@
 # YCast Home Assistant Addon
 
-> **Work in progress** - functional but station management is not configurable via UI yet.
-
 vTuner internet radio replacement for AVR devices, powered by [YCast](https://github.com/milaq/YCast).
 
 ## Requirements
@@ -24,9 +22,23 @@ vTuner internet radio replacement for AVR devices, powered by [YCast](https://gi
 
 ## Configuration
 
-### Stations
+### Stations (Web UI)
 
-Edit `/data/stations.yml` (accessible via the addon's share mapping or Samba):
+The addon registers a **YCast** panel in the Home Assistant UI. Open it from the
+addon page (**Open Web UI**) or enable it as a sidebar entry. There you can:
+
+- add stations by hand (category, name, stream URL)
+- search the [Radio Browser](https://www.radio-browser.info) index and add
+  stations with one click
+- edit or remove existing stations
+
+Changes are written to `/data/stations.yml` and take effect immediately, no
+restart needed.
+
+### Stations (manual)
+
+Alternatively edit `/data/stations.yml` directly (accessible via the addon's
+share mapping or Samba):
 
 ```yaml
 Category Name:

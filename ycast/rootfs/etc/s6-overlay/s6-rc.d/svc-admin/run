@@ -1,0 +1,11 @@
+#!/command/with-contenv bashio
+# shellcheck shell=bash
+# ==============================================================================
+# Home Assistant Add-on: YCast - Station Manager (Ingress Web UI)
+# ==============================================================================
+
+port=$(bashio::app.ingress_port)
+port=${port:-8099}
+
+bashio::log.info "Starting YCast station manager (ingress port ${port})..."
+exec python3 /opt/ycast/manager/admin.py --port "${port}" --stations /data/stations.yml
