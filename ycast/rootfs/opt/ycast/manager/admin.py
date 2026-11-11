@@ -15,6 +15,7 @@ ALLOWED_HOSTS = {"172.30.32.2", "127.0.0.1"}
 
 app = Flask(__name__)
 app.json.sort_keys = False
+app.config['MAX_CONTENT_LENGTH'] = 1_000_000
 stations_file = "/data/stations.yml"
 
 
@@ -113,8 +114,12 @@ def api_search():
         response = requests.get(url, params=params, headers=headers, timeout=15)
         response.raise_for_status()
         results_json = response.json()
-    except requests.RequestException as err:
+    except (requests.RequestException, ValueError) as err:
         logging.error("Radiobrowser search failed: %s", err)
+        return jsonify({"error": "radiobrowser search failed"}), 502
+    if not isinstance(results_json, list):
+        logging.error("Radiobrowser search returned unexpected data type: %s",
+                      type(results_json).__name__)
         return jsonify({"error": "radiobrowser search failed"}), 502
     results = []
     for station in results_json:

@@ -102,6 +102,17 @@ async function save() {
   }
 }
 
+async function commit(okMsg) {
+  try {
+    await save();
+    setStatus(okMsg, 'ok');
+  } catch (err) {
+    setStatus('Save failed: ' + err.message + ' - reloaded from server', 'error');
+    try { await load(); } catch (e) {}
+  }
+  render();
+}
+
 function render() {
   const cats = Object.keys(stations);
   const dl = document.getElementById('categories');
@@ -148,9 +159,7 @@ function editStation(row, cat, name, url) {
       if (Object.keys(stations[cat]).length === 0) delete stations[cat];
       stations[cat] = stations[cat] || {};
       stations[cat][nn] = nu;
-      try { await save(); setStatus('Station saved', 'ok'); }
-      catch (err) { setStatus('Save failed: ' + err.message, 'error'); }
-      render();
+      await commit('Station saved');
     }}, 'Save'),
     el('button', { class: 'secondary', onclick: render }, 'Cancel'));
   row.replaceWith(editRow);
@@ -159,9 +168,7 @@ function editStation(row, cat, name, url) {
 async function removeStation(cat, name) {
   delete stations[cat][name];
   if (Object.keys(stations[cat]).length === 0) delete stations[cat];
-  try { await save(); setStatus('Station removed', 'ok'); }
-  catch (err) { setStatus('Save failed: ' + err.message, 'error'); }
-  render();
+  await commit('Station removed');
 }
 
 async function addStation() {
@@ -174,11 +181,9 @@ async function addStation() {
   if (!cat || !name || !url) { setStatus('Category, name and URL are required', 'error'); return; }
   stations[cat] = stations[cat] || {};
   stations[cat][name] = url;
-  try { await save(); setStatus('Station added to ' + cat, 'ok'); }
-  catch (err) { setStatus('Save failed: ' + err.message, 'error'); }
   nameInput.value = '';
   urlInput.value = '';
-  render();
+  await commit('Station added to ' + cat);
 }
 
 async function addFromSearch(s) {
@@ -188,9 +193,7 @@ async function addFromSearch(s) {
   if (!cat) { setStatus('No category given', 'error'); return; }
   stations[cat] = stations[cat] || {};
   stations[cat][s.name] = s.url;
-  try { await save(); setStatus('"' + s.name + '" added to ' + cat, 'ok'); }
-  catch (err) { setStatus('Save failed: ' + err.message, 'error'); }
-  render();
+  await commit('"' + s.name + '" added to ' + cat);
 }
 
 async function search() {

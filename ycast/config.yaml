@@ -1,6 +1,6 @@
 name: "YCast"
 description: "vTuner internet radio replacement for AVR devices using YCast"
-version: "1.1.0"
+version: "1.1.1"
 slug: "ycast"
 url: "https://github.com/tost11/ycast-home-assistant-addon"
 arch:
